@@ -1,15 +1,13 @@
 ﻿namespace Validation.Web.Controllers
 {
-    using System;
     using System.Net;
     using System.Net.Http;
     using System.Text;
     using System.Web.Configuration;
     using System.Web.Http;
 
-    using NLog.Internal;
-
     using Validation.Html;
+    using Validation.Web.Models;
 
     using static System.String;
 
@@ -27,15 +25,19 @@
         [Route("validate/html")]
         public IHttpActionResult GetValidatorAllowedDefaults()
         {
-            var content =
-                new
-                    {
-                        allowedHtmlAttributes = HtmlValidator.Instance.DefaultAttributes,
-                        allowedUrlSchemes = HtmlValidator.Instance.DefaultUrlSchemes,
-                        defaultAllowedCssProperties = HtmlValidator.Instance.DefaultAllowedCssProperties,
-                        defaultAllowedTags = HtmlValidator.Instance.DefaultAllowedTags,
-                        defaultUrlAttributes = HtmlValidator.Instance.DefaultUrlAttributes
-                    };
+            var content = new HtmlValidationAllowedMetadata()
+                              {
+                                  AllowedHtmlAttributes =
+                                      HtmlValidator.Instance.DefaultAttributes,
+                                  AllowedUrlSchemes =
+                                      HtmlValidator.Instance.DefaultUrlSchemes,
+                                  DefaultAllowedCssProperties =
+                                      HtmlValidator.Instance.DefaultAllowedCssProperties,
+                                  DefaultAllowedTags =
+                                      HtmlValidator.Instance.DefaultAllowedTags,
+                                  DefaultUrlAttributes =
+                                      HtmlValidator.Instance.DefaultUrlAttributes
+                              };
 
             return Json(content);
         }
@@ -50,6 +52,7 @@
         /// </remarks>
         /// <param name="value"></param>
         /// <response code="200">The value provided did not need to be modified or sanitized</response>
+        /// <response code="201">The value provided was not valid, and the new, valid version will be returned in the response content</response>
         /// <response code="204">No value was provided, so the response was intentionally left blank</response>
         /// <response code="413">Value contained too many characters</response>
         /// <returns>Sanitized HTML as text/plain</returns>
@@ -77,7 +80,7 @@
 
             if (!wasModified) return new HttpResponseMessage(HttpStatusCode.OK);
 
-            var response = new HttpResponseMessage(HttpStatusCode.Continue) { Content = new StringContent(sanitized, Encoding.UTF8, @"text/plain") };
+            var response = new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent(sanitized, Encoding.UTF8, @"text/plain") };
 
             return response;
         }
