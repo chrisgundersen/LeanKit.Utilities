@@ -25,7 +25,7 @@
         /// <returns></returns>
         [AcceptVerbs("GET")]
         [Route("validate/html")]
-        public IHttpActionResult Get()
+        public IHttpActionResult GetValidatorAllowedDefaults()
         {
             var content =
                 new
@@ -55,7 +55,7 @@
         /// <returns>Sanitized HTML as text/plain</returns>
         [HttpPost]
         [Route("validate/html")]
-        public HttpResponseMessage Post([FromBody]string value)
+        public HttpResponseMessage FixHtml([FromBody]string value)
         {
             if (IsNullOrEmpty(value)) return new HttpResponseMessage(HttpStatusCode.NoContent);
 
@@ -77,7 +77,7 @@
 
             if (!wasModified) return new HttpResponseMessage(HttpStatusCode.OK);
 
-            var response = new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent(sanitized, Encoding.UTF8, @"text/plain") };
+            var response = new HttpResponseMessage(HttpStatusCode.Continue) { Content = new StringContent(sanitized, Encoding.UTF8, @"text/plain") };
 
             return response;
         }
