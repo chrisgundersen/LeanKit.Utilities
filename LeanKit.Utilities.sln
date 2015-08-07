@@ -13,8 +13,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Validation.Web", "Validatio
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Validation.Web.Tests", "Validation.Web.Tests\Validation.Web.Tests.csproj", "{4BC622B5-924E-447E-BEC7-4AC00B14BCE8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Log", "Log\Log.csproj", "{EFF4C359-9DBD-447F-8FE0-685329FEDE39}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MediaTypeFormatters", "MediaTypeFormatters\MediaTypeFormatters.csproj", "{07D7C8D6-1B98-4885-95B3-5B79DD483D11}"
 EndProject
 Global
@@ -39,10 +37,6 @@ Global
 		{4BC622B5-924E-447E-BEC7-4AC00B14BCE8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4BC622B5-924E-447E-BEC7-4AC00B14BCE8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4BC622B5-924E-447E-BEC7-4AC00B14BCE8}.Release|Any CPU.Build.0 = Release|Any CPU
-		{EFF4C359-9DBD-447F-8FE0-685329FEDE39}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{EFF4C359-9DBD-447F-8FE0-685329FEDE39}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{EFF4C359-9DBD-447F-8FE0-685329FEDE39}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{EFF4C359-9DBD-447F-8FE0-685329FEDE39}.Release|Any CPU.Build.0 = Release|Any CPU
 		{07D7C8D6-1B98-4885-95B3-5B79DD483D11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{07D7C8D6-1B98-4885-95B3-5B79DD483D11}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{07D7C8D6-1B98-4885-95B3-5B79DD483D11}.Release|Any CPU.ActiveCfg = Release|Any CPU

@@ -1,18 +1,24 @@
 ﻿namespace Validation.Web.Controllers
 {
+    using System;
     using System.Net;
     using System.Net.Http;
     using System.Text;
     using System.Web.Configuration;
     using System.Web.Http;
+    using System.Web.Http.Results;
 
-    using Validation.Html;
+    using NLog;
+
+    using Html;
     using Validation.Web.Models;
 
     using static System.String;
 
     public class ValidateController : ApiController
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         /// <summary>
         /// Gets the allowed HTML attributes, URL schemes, CSS properties, tags, and URL attributes
         /// </summary>
@@ -25,21 +31,33 @@
         [Route("validate/html")]
         public IHttpActionResult GetValidatorAllowedDefaults()
         {
-            var content = new HtmlValidationAllowedMetadata()
-                              {
-                                  AllowedHtmlAttributes =
-                                      HtmlValidator.Instance.DefaultAttributes,
-                                  AllowedUrlSchemes =
-                                      HtmlValidator.Instance.DefaultUrlSchemes,
-                                  DefaultAllowedCssProperties =
-                                      HtmlValidator.Instance.DefaultAllowedCssProperties,
-                                  DefaultAllowedTags =
-                                      HtmlValidator.Instance.DefaultAllowedTags,
-                                  DefaultUrlAttributes =
-                                      HtmlValidator.Instance.DefaultUrlAttributes
-                              };
+            try
+            {
+                Logger.Info("Begin GetValidatorAllowedDefaults()");
 
-            return Json(content);
+                var content = new HtmlValidationAllowedMetadata()
+                                  {
+                                      AllowedHtmlAttributes =
+                                          HtmlValidator.Instance.DefaultAttributes,
+                                      AllowedUrlSchemes =
+                                          HtmlValidator.Instance.DefaultUrlSchemes,
+                                      DefaultAllowedCssProperties =
+                                          HtmlValidator.Instance
+                                          .DefaultAllowedCssProperties,
+                                      DefaultAllowedTags =
+                                          HtmlValidator.Instance.DefaultAllowedTags,
+                                      DefaultUrlAttributes =
+                                          HtmlValidator.Instance.DefaultUrlAttributes
+                                  };
+
+                return Ok(content);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Error in GetValidatorAllowedDefaults()");
+
+                return new ExceptionResult(ex, this);
+            }
         }
 
         // POST: api/Validate
@@ -58,31 +76,41 @@
         /// <returns>Sanitized HTML as text/plain</returns>
         [HttpPost]
         [Route("validate/html")]
-        public HttpResponseMessage FixHtml([FromBody]string value)
+        public IHttpActionResult FixHtml([FromBody]string value)
         {
-            if (IsNullOrEmpty(value)) return new HttpResponseMessage(HttpStatusCode.NoContent);
-
-            int maxLength;
-
-            if (!int.TryParse(
-                WebConfigurationManager.AppSettings.Get("MaxHtmlValidationBodyPayloadLength"),
-                out maxLength))
+            try
             {
-                maxLength = 40000;
+                if (IsNullOrEmpty(value)) return new StatusCodeResult(HttpStatusCode.NoContent, this);
+
+                int maxLength;
+
+                if (!int.TryParse(
+                    WebConfigurationManager.AppSettings.Get("MaxHtmlValidationBodyPayloadLength"),
+                    out maxLength))
+                {
+                    maxLength = 40000;
+                }
+
+                if (value.Length > maxLength) return new StatusCodeResult(HttpStatusCode.RequestEntityTooLarge, this);
+
+                string sanitized;
+                bool wasModified;
+
+                HtmlValidator.Instance.IsValidHtml(value, out sanitized, out wasModified);
+
+                if (!wasModified) return new OkResult(this);
+
+                var response = new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent(sanitized, Encoding.UTF8, @"text/plain") };
+
+                return new ResponseMessageResult(response);
             }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Error in FixHtml");
 
-            if (value.Length > maxLength) return new HttpResponseMessage(HttpStatusCode.RequestEntityTooLarge);
-
-            string sanitized;
-            bool wasModified;
-
-            HtmlValidator.Instance.IsValidHtml(value, out sanitized, out wasModified);
-
-            if (!wasModified) return new HttpResponseMessage(HttpStatusCode.OK);
-
-            var response = new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent(sanitized, Encoding.UTF8, @"text/plain") };
-
-            return response;
+                return new InternalServerErrorResult(this);
+            }
+            
         }
     }
 }

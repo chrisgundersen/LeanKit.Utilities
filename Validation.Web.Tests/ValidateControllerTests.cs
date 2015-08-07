@@ -1,65 +1,71 @@
-﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-
-namespace Validation.Web.Tests
+﻿namespace Validation.Web.Tests
 {
-    using System.Collections.Generic;
+    using System.IO;
+    using System.Net;
+    using System.Web.Http.Results;
+
+    using Microsoft.VisualStudio.TestTools.UnitTesting;
 
     using Validation.Web.Controllers;
-    using Validation.Web.Models;
 
     [TestClass]
     public class ValidateControllerTests
     {
+        private readonly ValidateController controller = new ValidateController();
+
         [TestMethod]
         public void GetValidate_ShouldReturnJson()
         {
-            var controller = new ValidateController();
+            var response = this.controller.GetValidatorAllowedDefaults();
 
-            var result = controller.GetValidatorAllowedDefaults();
-
-            Assert.IsNotNull(result);
+            Assert.IsNotNull(response);
         }
 
-        //[TestMethod]
-        //public async Task GetAllProductsAsync_ShouldReturnAllProducts()
-        //{
-        //    var testProducts = GetTestProducts();
-        //    var controller = new SimpleProductController(testProducts);
+        [TestMethod]
+        public void GetValidatedHtml_ShouldReturn204WhenNoValueProvided()
+        {
+            var response = this.controller.FixHtml(string.Empty) as StatusCodeResult;
 
-        //    var result = await controller.GetAllProductsAsync() as List<Product>;
-        //    Assert.AreEqual(testProducts.Count, result.Count);
-        //}
+            Assert.IsNotNull(response);
+            Assert.AreEqual(response.StatusCode, HttpStatusCode.NoContent);
+        }
 
-        //[TestMethod]
-        //public void GetProduct_ShouldReturnCorrectProduct()
-        //{
-        //    var testProducts = GetTestProducts();
-        //    var controller = new SimpleProductController(testProducts);
+        [TestMethod]
+        public void GetValidatedHtml_ShouldReturn200WhenOk()
+        {
+            var testValue = @"<p></p>";
 
-        //    var result = controller.GetProduct(4) as OkNegotiatedContentResult<Product>;
-        //    Assert.IsNotNull(result);
-        //    Assert.AreEqual(testProducts[3].Name, result.Content.Name);
-        //}
+            var response = this.controller.FixHtml(testValue) as OkResult;
 
-        //[TestMethod]
-        //public async Task GetProductAsync_ShouldReturnCorrectProduct()
-        //{
-        //    var testProducts = GetTestProducts();
-        //    var controller = new SimpleProductController(testProducts);
+            Assert.IsNotNull(response);
+        }
 
-        //    var result = await controller.GetProductAsync(4) as OkNegotiatedContentResult<Product>;
-        //    Assert.IsNotNull(result);
-        //    Assert.AreEqual(testProducts[3].Name, result.Content.Name);
-        //}
+        [TestMethod]
+        public void GetValidatedHtml_ShouldReturn201WhenModified()
+        {
+            var testValue = @"<div>Test</div><SCRIPT SRC=http://ha.ckers.org/xss.js></SCRIPT>";
+            var expected = @"<div>Test</div>";
 
-        //[TestMethod]
-        //public void GetProduct_ShouldNotFindProduct()
-        //{
-        //    var controller = new SimpleProductController(GetTestProducts());
+            var responseMessage = this.controller.FixHtml(testValue) as ResponseMessageResult;
 
-        //    var result = controller.GetProduct(999);
-        //    Assert.IsInstanceOfType(result, typeof(NotFoundResult));
-        //}
+            Assert.IsNotNull(responseMessage);
+            Assert.AreEqual(responseMessage.Response.StatusCode, HttpStatusCode.Created);
+
+            var responseContent = responseMessage.Response.Content.ReadAsStringAsync().Result;
+            Assert.AreEqual(responseContent, expected);
+        }
+
+        [TestMethod]
+        public void GetValidatedHtml_ShouldReturn413WhenValueTooLarge()
+        {
+            var currentDirectory = Directory.GetCurrentDirectory();
+
+            var testValue = File.ReadAllText($@"{currentDirectory}\{@"40k1.txt"}");
+
+            var response = this.controller.FixHtml(testValue) as StatusCodeResult;
+
+            Assert.IsNotNull(response);
+            Assert.AreEqual(response.StatusCode, HttpStatusCode.RequestEntityTooLarge);
+        }
     }
 }

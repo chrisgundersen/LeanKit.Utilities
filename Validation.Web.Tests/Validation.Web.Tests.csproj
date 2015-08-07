@@ -68,6 +68,9 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="40k1.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="scripts\ai.0.15.0-build32981.js" />
     <Content Include="scripts\ai.0.15.0-build32981.min.js" />
   </ItemGroup>
