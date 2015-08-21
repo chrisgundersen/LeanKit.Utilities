@@ -4,12 +4,10 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Validation.Html;
-using Validation.Html.Tests;
-using Validation.Web;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using CommandLine;
-using RestSharp;
-using RestSharp.Validation;
+using System.Data.SqlClient;
 
 
 namespace Validation.TestUtility
@@ -20,9 +18,13 @@ namespace Validation.TestUtility
         {
             TextReader tr;
             TextWriter tw;
-            string defaultEndpoint = "http://localhost:53033";
+            string defaultEndpoint = "http://localhost:53033/validate/html";
+            string defaultReadfile = @"C:\Users\Administrator\Documents\GitHub\LeanKit.Utilities\Validation.TestUtility\test.txt";
+            string defaultWritefile = @"C:\Users\Administrator\Documents\GitHub\LeanKit.Utilities\Validation.TestUtility\test2.txt";
             string ep;
-            RestClient client = new RestClient();
+            string connectionString = null;
+            string query = null;
+
 
             //handle options
             var options = new Options();
@@ -30,13 +32,24 @@ namespace Validation.TestUtility
             {
                 if (options.inputFile != null)
                 {
-                    tr = new StreamReader(options.inputFile);
-                    Console.WriteLine(String.Format("Input file is set as {0}", tr.ToString()));
+                    try
+                    {
+                        tr = new StreamReader(options.inputFile);
+                        Console.WriteLine(String.Format("Input file is set as {0}", tr.ToString()));
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(@"Cannot locate this file. Setting input at default value.");
+                        tr = new StreamReader(defaultReadfile);
+
+                    }
                 }
                 else
                 {
-                    tr = new StreamReader(@"C:\Users\Administrator\Documents\GitHub\LeanKit.Utilities\test.txt");
-                    Console.WriteLine(@"Input file is set as C:\Users\Administrator\Documents\GitHub\LeanKit.Utilities\test.txt");
+
+                    tr = new StreamReader(defaultReadfile);
+                    Console.WriteLine(@"Input file is set as C:\Users\Administrator\Documents\GitHub\LeanKit.Utilities\Validation.TestUtility\test.txt");
+
                 }
                 if (options.outputFile != null)
                 {
@@ -45,8 +58,8 @@ namespace Validation.TestUtility
                 }
                 else
                 {
-                    tw = new StreamWriter(@"C:\Users\Administrator\Documents\GitHub\LeanKit.Utilities\test2.txt");
-                    Console.WriteLine(@"C:\Users\Administrator\Documents\GitHub\LeanKit.Utilities\test2.txt");
+                    tw = new StreamWriter(defaultWritefile);
+                    Console.WriteLine(defaultWritefile);
                 }
                 if (options.url != null)
                 {
@@ -59,93 +72,173 @@ namespace Validation.TestUtility
                 }
                 else
                 {
-                    
+
                     ep = defaultEndpoint;
                     Console.WriteLine(String.Format(@"The api endpoint set is{0}", defaultEndpoint));
+                }
+                //Check and set database variables
+                if (options.dbserver != null && options.dbname != null && options.dbuser != null && options.dbpassword != null && options.dbquery != null)
+                {
+                    connectionString = String.Format(@"Data Source = {0}; Initial Catalog ={1}; Persist Security Info = true; User ID={2};Password={3}", options.dbserver, options.dbname, options.dbuser, options.dbpassword);
+                    query = options.dbquery;
                 }
 
             }
             else
             {
                 string url;
-                tr = new StreamReader(@"C:\Users\Administrator\Documents\GitHub\LeanKit.Utilities\test.txt");
-                tw = new StreamWriter(@"C:\Users\Administrator\Documents\GitHub\LeanKit.Utilities\test2.txt");
+                tr = new StreamReader(defaultReadfile);
+                tw = new StreamWriter(defaultWritefile);
                 ep = defaultEndpoint;
+                connectionString = null;
 
             }
 
             ////////////////////////////////////////
 
-            if (options.url != null)
+            if (options.url != null)        //if scraping a url
             {
 
-                IRestResponse resp =scrapper(options.url);
-                tw.WriteLine(resp.Content);
+                Task<String> resp = scraper(options.url);
 
-                if (resp.Content != null)
-                {   
-                    IRestResponse apiresp = ApiRequest(resp.Content, ep);
-                    if (apiresp != null)
+                if (resp.Result != null)
+                {
+                    Task<String> apiresp = ApiRequest(resp.Result, ep);
+                    if (apiresp.Result != null)
                     {
-                        string s = apiresp.Content;
-                        tw.WriteLine(s);      
+                        string s = apiresp.Result;
+                        tw.WriteLine("\tResult:\t{0}\n", s);
+                    }
+                    else
+                    {
+                        tw.WriteLine("\tResult: Format accepted\n");
                     }
                 }
-                else { Console.WriteLine("No conent returned by requested URL"); }
+                else
+                {
+                    Console.WriteLine("No conent returned by requested URL\n");
+                }
             }
-            else
+            else if (options.dbserver != null && options.dbname != null && options.dbuser != null && options.dbpassword != null && options.dbquery != null) //else if testing against database
+            {
+                sqlTester(connectionString, query, tw, ep);
+
+            }
+            else    //else Basic check against file
             {
                 string xssrequest;
-
                 while ((xssrequest = tr.ReadLine()) != null)
                 {
-                    IRestResponse resp = ApiRequest(xssrequest, ep);
+                    Task<String> resp = ApiRequest(xssrequest, ep);
 
                     if (resp != null)
                     {
-                        tw.WriteLine(resp.Content);
+                        string s = resp.Result;
+                        tw.WriteLine("Result:\t{0}\n", s);
                     }
 
                 }
             }
 
-            tr.Close();
+
+
+            //close files
+            if (tr != null)
+            {
+                tr.Close();
+            }
             tw.Close();
 
             Console.ReadLine();
 
         }
 
-        public static IRestResponse scrapper(string url)
-        {
-            var client = new RestClient();
-            client.BaseUrl = new Uri(url);
-            var request = new RestRequest("", Method.GET);
-            IRestResponse response = client.Execute(request);
 
-            return response;
-        }
-
-        public static IRestResponse ApiRequest(string req, string c)
+        /* Web Scraper */
+        public static async Task<String> scraper(string url)
         {
             try
             {
-                Console.WriteLine("see here");
-
-                var client = new RestClient(c);
-                var request = new RestRequest("/validate/html", Method.GET);
-                //request.Resource = "validate/html";
-                //request.AddBody(req);
-
-                IRestResponse response = client.Execute(request);
-                return response;
+                HttpClient client = new HttpClient();
+                client.BaseAddress = new Uri(url);
+                var response = await client.GetAsync(url);
+                var contents = response.Content.ReadAsStringAsync().Result;
+                return contents;
             }
-            catch(Exception ex)
+            catch (Exception ex) { return null; }
+        }
+
+        /* Api-Request method */
+        public static async Task<String> ApiRequest(string req, string c)
+        {
+            try
             {
-                var i = 0;
+                HttpClient client = new HttpClient();
+                client.BaseAddress = new Uri(c);
+                var response = await client.PostAsync(c, new StringContent(req));
+                var contents = response.Content.ReadAsStringAsync().Result;
+                return contents;
+            }
+            catch (Exception ex)
+            {
                 return null;
             }
 
+        }
+        /* Sql-test handler */
+        public static void sqlTester(string connectionString, string query, TextWriter tw, string ep)
+        {
+            if (query == null)
+            {
+                Console.WriteLine("Error. No query was provided.");
+                tw.WriteLine("Error. No query was provided.");
+            }
+            SqlConnection connection = new SqlConnection(connectionString);
+            SqlCommand cmd = new SqlCommand();
+            SqlDataReader reader;
+
+            cmd.CommandText = query;
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Connection = connection;
+
+            connection.Open();
+
+            reader = cmd.ExecuteReader();
+            if (reader.HasRows)
+            {
+                Console.WriteLine("\t{0}\r\n", reader.GetName(0));
+                tw.WriteLine("\t{0}\n", reader.GetName(0));
+                int total = 0;
+                int sanitized = 0;
+
+                while (reader.Read())
+                {
+                    string req = reader.GetString(0);
+                    Console.WriteLine("Request: {0}\n", req);
+                    tw.WriteLine("Request: {0}\n", req);
+                    Task<String> apiresp = ApiRequest(req, ep);
+                    if (apiresp.Result != null)
+                    {
+                        Console.WriteLine("\tResponse: {0}", apiresp.Result);
+                        tw.WriteLine("\tResponse: {0}", apiresp.Result);
+                        sanitized++;
+                    }
+
+
+                    total++;
+                }
+
+                Console.WriteLine("Sanitized requests over total requests:\t {0}/{1}", sanitized, total);
+                tw.WriteLine("Sanitized requests over total requests:\t {0}/{1}", sanitized, total);
+
+            }
+            else
+            {
+                Console.WriteLine("Reader has no rows.");
+                tw.WriteLine("Reader has no rows");
+            }
+
+            connection.Close();
         }
 
 
@@ -169,6 +262,27 @@ namespace Validation.TestUtility
             HelpText = "API endpoint to hit. Defaults to localhost:53033")]
         public string endpoint { get; set; }
 
+        [Option('s', "dbservername", Required = false,
+            HelpText = "Name of the database server (optional)")]
+        public string dbserver { get; set; }
+
+        [Option('n', "dbname", Required = false,
+            HelpText = "Name of the database itself")]
+        public string dbname { get; set; }
+
+        [Option('i', "dbuser", Required = false,
+            HelpText = "Database User")]
+        public string dbuser { get; set; }
+
+        [Option('p', "dbpass", Required = false,
+            HelpText = "Database Password, to be used with username")]
+        public string dbpassword { get; set; }
+
+        [Option('q', "dbquery", Required = false,
+            HelpText = "Query to run against the database")]
+        public string dbquery { get; set; }
+
+
         [HelpOption]
         public string GetUsage()
         {
@@ -178,6 +292,11 @@ namespace Validation.TestUtility
             usage.AppendLine("-o|--outputFile -- Output file to write results to");
             usage.AppendLine("-u|--url-- Url to scrape html from for testing");
             usage.AppendLine("-e| --endpoint -- API endpoint to hit. Defaults to 127.0.0.1:53033");
+            usage.AppendLine("-s| --dbservername -- Server which DB is hosted (if using db to test data)");
+            usage.AppendLine("-n| --dbname -- Name of Database (if using db to test data)");
+            usage.AppendLine("-i| --dbuser -- DB username (if using db to test data)");
+            usage.AppendLine("-p| --dbpass -- Password for DB user (if using db to test data)");
+            usage.AppendLine("-q| --dbquery -- Query to run against the databse");
             return usage.ToString();
         }
     }
